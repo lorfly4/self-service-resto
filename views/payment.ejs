@@ -32,16 +32,16 @@
                     <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
                     <path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd" />
                 </svg>
-                Bank Transfer (Dummy)
+                Bank Transfer
             </h4>
             <p class="text-sm text-blue-600 mb-2">Please transfer the exact amount to:</p>
             <div class="text-lg font-mono bg-white p-3 rounded border border-blue-100 text-center select-all">
-                BCA 1234567890
+                <%= store.bank_name %> <%= store.bank_account_number %>
             </div>
-            <p class="text-center text-xs text-blue-400 mt-2">A/N Self Service Resto</p>
+            <p class="text-center text-xs text-blue-400 mt-2">A/N <%= store.bank_account_holder %></p>
         </div>
 
-        <form action="/payment/<%= order.id %>/confirm" method="POST">
+        <form action="/stores/<%= store.slug %>/payment/<%= order.id %>/confirm" method="POST">
             <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-6 rounded-xl shadow-lg transition duration-300 transform hover:-translate-y-1 flex justify-center items-center">
                 <span>I Have Paid</span>
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ml-2" viewBox="0 0 20 20" fill="currentColor">

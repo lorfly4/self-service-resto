@@ -8,11 +8,7 @@ const fs = require('fs-extra');
 
 // Database Models
 const sequelize = require('./config/database');
-const Item = require('./models/Item');
-const Order = require('./models/Order');
-const OrderItem = require('./models/OrderItem');
-const StoreProfile = require('./models/StoreProfile');
-const User = require('./models/User');
+const { Store, User, Item, Order, OrderItem } = require('./models');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -35,7 +31,9 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// Helper: Get User ID from Cookie
+// --- MIDDLEWARE HELPERS ---
+
+// 1. Get/Set Guest User ID
 const getUserId = (req, res) => {
     let userId = req.cookies.user_id;
     if (!userId) {
@@ -45,62 +43,122 @@ const getUserId = (req, res) => {
     return userId;
 };
 
+// 2. Authentication Middleware
+const authMiddleware = async (req, res, next) => {
+    const userId = req.cookies.auth_user_id;
+    if (userId) {
+        try {
+            const user = await User.findByPk(userId);
+            if (user) {
+                req.user = user;
+                res.locals.user = user; // Make user available in views
+                return next();
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }
+    req.user = null;
+    res.locals.user = null;
+    next();
+};
+
+const requireAuth = (req, res, next) => {
+    if (!req.user) {
+        return res.redirect('/admin/login');
+    }
+    next();
+};
+
+const requireSuperAdmin = (req, res, next) => {
+    if (!req.user || req.user.role !== 'super_admin') {
+        return res.status(403).send('Access Denied: Super Admin Only');
+    }
+    next();
+};
+
+const requireStoreAccess = (req, res, next) => {
+    const targetStoreId = parseInt(req.params.storeId);
+    
+    if (!req.user) return res.redirect('/admin/login');
+
+    // Super Admin can access any store
+    if (req.user.role === 'super_admin') {
+        return next();
+    }
+
+    // Store Admin/Staff can only access their own store
+    if (req.user.store_id === targetStoreId) {
+        return next();
+    }
+
+    res.status(403).send('Access Denied: You do not have permission for this store.');
+};
+
+// 3. Store Resolution Middleware (for Customer Routes)
+const resolveStore = async (req, res, next) => {
+    const slug = req.params.slug;
+    try {
+        const store = await Store.findOne({ where: { slug } });
+        if (!store) {
+            return res.status(404).send('Store not found');
+        }
+        req.store = store;
+        res.locals.store = store; // Make store available in views
+        next();
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
+};
+
+app.use(authMiddleware);
+
 // --- ROUTES ---
 
-// 1. Customer Routes
-
-// Home / Menu
+// === LANDING PAGE (List Stores) ===
 app.get('/', async (req, res) => {
-    getUserId(req, res); // Ensure cookie is set
     try {
-        const items = await Item.findAll({ where: { is_available: true } });
-        const store = await StoreProfile.findOne();
-        res.render('index', { items, store });
+        const stores = await Store.findAll();
+        res.render('landing', { stores });
     } catch (err) {
         console.error(err);
         res.status(500).send('Server Error');
     }
 });
 
-// Cart (In-memory cart for simplicity or stored in cookie? Better in session/cookie or local storage. 
-// For this simple app, let's use a simple client-side cart or cookie-based cart.
-// Since the prompt mentions "simpan cookie setiap user", I'll use cookies to track the user ID, 
-// but for the cart itself, passing it via form or local storage is easier. 
-// However, the flowchart implies "Tambah Menu -> Masukan Jumlah".
-// I'll implement a simple cart using a cookie `cart` which stores JSON string of items.
-// Or better, just handle it in the frontend with localStorage and send to backend on checkout.
-// Backend cart is more robust. Let's use a temporary `Order` with status 'cart' in DB? 
-// No, the prompt says "Order History", so 'cart' is pre-order.
-// Let's stick to a simple array in cookie `cart_items` for simplicity.)
+// === CUSTOMER ROUTES (Storefront) ===
 
-app.post('/cart/add', (req, res) => {
-    const { itemId, quantity } = req.body;
-    let cart = req.cookies.cart || [];
-    
-    // Check if item already exists
-    const existingItemIndex = cart.findIndex(item => item.itemId === itemId);
-    if (existingItemIndex > -1) {
-        cart[existingItemIndex].quantity = parseInt(cart[existingItemIndex].quantity) + parseInt(quantity);
-    } else {
-        cart.push({ itemId, quantity: parseInt(quantity) });
+// Store Home
+app.get('/stores/:slug', resolveStore, async (req, res) => {
+    getUserId(req, res);
+    try {
+        const items = await Item.findAll({ 
+            where: { 
+                store_id: req.store.id,
+                is_available: true 
+            } 
+        });
+        res.render('index', { items, store: req.store });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
     }
-    
-    res.cookie('cart', cart, { maxAge: 9000000000, httpOnly: true });
-    res.redirect('/');
 });
 
-app.get('/cart', async (req, res) => {
-    const cart = req.cookies.cart || [];
-    const userId = getUserId(req, res);
+// Cart
+app.get('/stores/:slug/cart', resolveStore, async (req, res) => {
+    // Cart is stored in cookie `cart_${storeId}` to separate carts per store
+    const cartCookieName = `cart_${req.store.id}`;
+    const cart = req.cookies[cartCookieName] || [];
     
     try {
-        // Fetch item details
         const cartItems = [];
         let total = 0;
         
         for (const cartItem of cart) {
             const item = await Item.findByPk(cartItem.itemId);
-            if (item) {
+            if (item && item.store_id === req.store.id) {
                 cartItems.push({
                     item: item,
                     quantity: cartItem.quantity,
@@ -110,28 +168,45 @@ app.get('/cart', async (req, res) => {
             }
         }
         
-        const store = await StoreProfile.findOne();
-        res.render('cart', { cartItems, total, store });
+        res.render('cart', { cartItems, total, store: req.store });
     } catch (err) {
         console.error(err);
         res.status(500).send('Server Error');
     }
 });
 
-app.post('/cart/remove', (req, res) => {
-    const { itemId } = req.body;
-    let cart = req.cookies.cart || [];
-    cart = cart.filter(item => item.itemId !== itemId);
-    res.cookie('cart', cart, { maxAge: 9000000000, httpOnly: true });
-    res.redirect('/cart');
+app.post('/stores/:slug/cart/add', resolveStore, (req, res) => {
+    const { itemId, quantity } = req.body;
+    const cartCookieName = `cart_${req.store.id}`;
+    let cart = req.cookies[cartCookieName] || [];
+    
+    const existingItemIndex = cart.findIndex(item => item.itemId === itemId);
+    if (existingItemIndex > -1) {
+        cart[existingItemIndex].quantity = parseInt(cart[existingItemIndex].quantity) + parseInt(quantity);
+    } else {
+        cart.push({ itemId, quantity: parseInt(quantity) });
+    }
+    
+    res.cookie(cartCookieName, cart, { maxAge: 9000000000, httpOnly: true });
+    res.redirect(`/stores/${req.params.slug}`);
 });
 
-// Checkout & Place Order
-app.post('/checkout', async (req, res) => {
+app.post('/stores/:slug/cart/remove', resolveStore, (req, res) => {
+    const { itemId } = req.body;
+    const cartCookieName = `cart_${req.store.id}`;
+    let cart = req.cookies[cartCookieName] || [];
+    cart = cart.filter(item => item.itemId !== itemId);
+    res.cookie(cartCookieName, cart, { maxAge: 9000000000, httpOnly: true });
+    res.redirect(`/stores/${req.params.slug}/cart`);
+});
+
+// Checkout
+app.post('/stores/:slug/checkout', resolveStore, async (req, res) => {
     const userId = getUserId(req, res);
-    const cart = req.cookies.cart || [];
+    const cartCookieName = `cart_${req.store.id}`;
+    const cart = req.cookies[cartCookieName] || [];
     
-    if (cart.length === 0) return res.redirect('/');
+    if (cart.length === 0) return res.redirect(`/stores/${req.params.slug}`);
 
     try {
         let totalAmount = 0;
@@ -139,7 +214,7 @@ app.post('/checkout', async (req, res) => {
 
         for (const cartItem of cart) {
             const item = await Item.findByPk(cartItem.itemId);
-            if (item) {
+            if (item && item.store_id === req.store.id) {
                 totalAmount += item.price * cartItem.quantity;
                 orderItemsData.push({
                     item_id: item.id,
@@ -150,10 +225,12 @@ app.post('/checkout', async (req, res) => {
         }
 
         const order = await Order.create({
+            store_id: req.store.id,
             user_uuid: userId,
+            customer_name: 'Guest', // Can be updated in payment page
             total_amount: totalAmount,
             order_number: `ORD-${Date.now().toString().slice(-6)}`,
-            status: 'pending' // Pending payment
+            status: 'pending'
         });
 
         for (const itemData of orderItemsData) {
@@ -163,9 +240,8 @@ app.post('/checkout', async (req, res) => {
             });
         }
 
-        // Clear cart
-        res.clearCookie('cart');
-        res.redirect(`/payment/${order.id}`);
+        res.clearCookie(cartCookieName);
+        res.redirect(`/stores/${req.params.slug}/payment/${order.id}`);
 
     } catch (err) {
         console.error(err);
@@ -173,31 +249,33 @@ app.post('/checkout', async (req, res) => {
     }
 });
 
-// Payment Page
-app.get('/payment/:id', async (req, res) => {
+// Payment
+app.get('/stores/:slug/payment/:id', resolveStore, async (req, res) => {
     try {
-        const order = await Order.findByPk(req.params.id, {
+        const order = await Order.findOne({
+            where: { id: req.params.id, store_id: req.store.id },
             include: [{ model: OrderItem, include: [Item] }]
         });
         if (!order) return res.status(404).send('Order not found');
         
-        const store = await StoreProfile.findOne();
-        res.render('payment', { order, store });
+        res.render('payment', { order, store: req.store });
     } catch (err) {
         console.error(err);
         res.status(500).send('Server Error');
     }
 });
 
-// Confirm Payment (Simulated)
-app.post('/payment/:id/confirm', async (req, res) => {
+app.post('/stores/:slug/payment/:id/confirm', resolveStore, async (req, res) => {
     try {
-        const order = await Order.findByPk(req.params.id);
+        const order = await Order.findOne({ where: { id: req.params.id, store_id: req.store.id } });
         if (order) {
-            order.status = 'paid'; // Or 'completed'
+            order.status = 'paid';
+            if (req.body.customer_name) {
+                order.customer_name = req.body.customer_name;
+            }
             await order.save();
         }
-        res.redirect(`/history`);
+        res.redirect(`/stores/${req.params.slug}/history`);
     } catch (err) {
         console.error(err);
         res.status(500).send('Server Error');
@@ -205,16 +283,18 @@ app.post('/payment/:id/confirm', async (req, res) => {
 });
 
 // History
-app.get('/history', async (req, res) => {
+app.get('/stores/:slug/history', resolveStore, async (req, res) => {
     const userId = getUserId(req, res);
     try {
         const orders = await Order.findAll({
-            where: { user_uuid: userId },
+            where: { 
+                user_uuid: userId,
+                store_id: req.store.id
+            },
             include: [{ model: OrderItem, include: [Item] }],
             order: [['createdAt', 'DESC']]
         });
-        const store = await StoreProfile.findOne();
-        res.render('history', { orders, store });
+        res.render('history', { orders, store: req.store });
     } catch (err) {
         console.error(err);
         res.status(500).send('Server Error');
@@ -222,10 +302,13 @@ app.get('/history', async (req, res) => {
 });
 
 
-// 2. Admin Routes
+// === AUTHENTICATION ===
 
-// Login
-app.get('/admin', (req, res) => {
+app.get('/admin/login', (req, res) => {
+    if (req.user) {
+        if (req.user.role === 'super_admin') return res.redirect('/super-admin/dashboard');
+        return res.redirect(`/admin/store/${req.user.store_id}/dashboard`);
+    }
     res.render('admin/login', { error: null });
 });
 
@@ -235,8 +318,13 @@ app.post('/admin/login', async (req, res) => {
         const user = await User.findOne({ where: { username } });
         
         if (user && user.password === password) {
-            res.cookie('admin_auth', 'true', { httpOnly: true });
-            res.redirect('/admin/dashboard');
+            res.cookie('auth_user_id', user.id, { httpOnly: true });
+            
+            if (user.role === 'super_admin') {
+                return res.redirect('/super-admin/dashboard');
+            } else {
+                return res.redirect(`/admin/store/${user.store_id}/dashboard`);
+            }
         } else {
             res.render('admin/login', { error: 'Invalid Username or Password' });
         }
@@ -246,25 +334,58 @@ app.post('/admin/login', async (req, res) => {
     }
 });
 
-// Admin Middleware
-const adminAuth = (req, res, next) => {
-    if (req.cookies.admin_auth === 'true') {
-        next();
-    } else {
-        res.redirect('/admin');
-    }
-};
-
 app.get('/admin/logout', (req, res) => {
-    res.clearCookie('admin_auth');
-    res.redirect('/admin');
+    res.clearCookie('auth_user_id');
+    res.redirect('/admin/login');
 });
 
-// Dashboard
-app.get('/admin/dashboard', adminAuth, async (req, res) => {
+
+// === SUPER ADMIN ROUTES ===
+
+app.get('/super-admin/dashboard', requireAuth, requireSuperAdmin, async (req, res) => {
     try {
-        const items = await Item.findAll();
-        const store = await StoreProfile.findOne();
+        const stores = await Store.findAll({
+            include: [{ model: User, required: false }]
+        });
+        res.render('super-admin/dashboard', { stores });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
+});
+
+app.post('/super-admin/stores/add', requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+        const { name, slug, description, bank_name, bank_account_number, bank_account_holder, admin_username, admin_password } = req.body;
+        
+        const store = await Store.create({
+            name, slug, description, bank_name, bank_account_number, bank_account_holder
+        });
+
+        // Create Admin for this store
+        await User.create({
+            username: admin_username,
+            password: admin_password,
+            role: 'admin',
+            store_id: store.id
+        });
+
+        res.redirect('/super-admin/dashboard');
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error creating store: ' + err.message);
+    }
+});
+
+
+// === STORE ADMIN ROUTES ===
+
+// Dashboard
+app.get('/admin/store/:storeId/dashboard', requireAuth, requireStoreAccess, async (req, res) => {
+    try {
+        const storeId = req.params.storeId;
+        const store = await Store.findByPk(storeId);
+        const items = await Item.findAll({ where: { store_id: storeId } });
         res.render('admin/dashboard', { items, store });
     } catch (err) {
         console.error(err);
@@ -272,72 +393,103 @@ app.get('/admin/dashboard', adminAuth, async (req, res) => {
     }
 });
 
-// Add Item
-app.post('/admin/items/add', adminAuth, upload.single('image'), async (req, res) => {
-    try {
-        const { name, description, price } = req.body;
-        await Item.create({
-            name,
-            description,
-            price,
-            image_url: req.file ? `/uploads/${req.file.filename}` : null
-        });
-        res.redirect('/admin/dashboard');
-    } catch (err) {
-        console.error(err);
-        res.status(500).send('Error adding item');
-    }
-});
-
 // Update Store Profile
-app.post('/admin/store/update', adminAuth, async (req, res) => {
+app.post('/admin/store/:storeId/update', requireAuth, requireStoreAccess, async (req, res) => {
     try {
-        const { name, description, password } = req.body;
-        const store = await StoreProfile.findOne();
+        const { name, description, bank_name, bank_account_number, bank_account_holder } = req.body;
+        const store = await Store.findByPk(req.params.storeId);
         
         store.name = name;
         store.description = description;
-        if (password) store.admin_password = password;
+        store.bank_name = bank_name;
+        store.bank_account_number = bank_account_number;
+        store.bank_account_holder = bank_account_holder;
         
         await store.save();
-        res.redirect('/admin/dashboard');
+        res.redirect(`/admin/store/${req.params.storeId}/dashboard`);
     } catch (err) {
         console.error(err);
         res.status(500).send('Error updating store');
     }
 });
 
-// Kitchen / Calling Page
-app.get('/admin/kitchen', adminAuth, async (req, res) => {
+// Add Item
+app.post('/admin/store/:storeId/items/add', requireAuth, requireStoreAccess, upload.single('image'), async (req, res) => {
     try {
+        const { name, description, price } = req.body;
+        await Item.create({
+            store_id: req.params.storeId,
+            name,
+            description,
+            price,
+            image_url: req.file ? `/uploads/${req.file.filename}` : null
+        });
+        res.redirect(`/admin/store/${req.params.storeId}/dashboard`);
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error adding item');
+    }
+});
+
+// Kitchen
+app.get('/admin/store/:storeId/kitchen', requireAuth, requireStoreAccess, async (req, res) => {
+    try {
+        const storeId = req.params.storeId;
+        const store = await Store.findByPk(storeId);
         const orders = await Order.findAll({
-            where: { status: ['paid', 'pending'] }, // Show active orders
+            where: { 
+                store_id: storeId,
+                status: ['paid', 'pending'] 
+            },
             include: [{ model: OrderItem, include: [Item] }],
             order: [['createdAt', 'ASC']]
         });
-        res.render('admin/kitchen', { orders });
+        res.render('admin/kitchen', { orders, store });
     } catch (err) {
         console.error(err);
         res.status(500).send('Server Error');
     }
 });
 
-app.post('/admin/order/:id/status', adminAuth, async (req, res) => {
+app.post('/admin/store/:storeId/order/:orderId/status', requireAuth, requireStoreAccess, async (req, res) => {
     try {
         const { status } = req.body;
-        const order = await Order.findByPk(req.params.id);
+        const order = await Order.findOne({ 
+            where: { 
+                id: req.params.orderId,
+                store_id: req.params.storeId
+            } 
+        });
         if (order) {
             order.status = status;
             await order.save();
         }
-        res.redirect('/admin/kitchen');
+        res.redirect(`/admin/store/${req.params.storeId}/kitchen`);
     } catch (err) {
         console.error(err);
         res.status(500).send('Error updating order');
     }
 });
 
+
 // Start Server
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+const startServer = async () => {
+    try {
+        await sequelize.authenticate();
+        console.log('Database connected.');
+        app.listen(PORT, () => {
+            console.log(`Server running on http://localhost:${PORT}`);
+        });
+    } catch (err) {
+        console.error('Unable to connect to the database:', err);
+    }
+};
+
+startServer();
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
 });

@@ -2,6 +2,7 @@ const sequelize = require('./config/database');
 const Item = require('./models/Item');
 const Order = require('./models/Order');
 const OrderItem = require('./models/OrderItem');
+const Store = require('./models/Store');
 
 const gacoanMenu = [
     // Noodles
@@ -135,15 +136,23 @@ async function seed() {
         await sequelize.authenticate();
         console.log('Database connected.');
 
+        // Find the store
+        const store = await Store.findOne({ where: { slug: 'mie-gacoan-tebet' } });
+        if (!store) {
+            throw new Error('Store mie-gacoan-tebet not found. Please run sync-db.js first.');
+        }
+        console.log(`Found store: ${store.name}`);
+
         // Clear existing data (Order matters for FK)
         await OrderItem.destroy({ where: {}, truncate: false });
         await Order.destroy({ where: {}, truncate: false });
         await Item.destroy({ where: {}, truncate: false });
         console.log('Existing data cleared.');
 
-        // Insert new items
-        await Item.bulkCreate(gacoanMenu);
-        console.log(`Successfully injected ${gacoanMenu.length} menu items.`);
+        // Insert new items with store_id
+        const itemsWithStore = gacoanMenu.map(item => ({ ...item, store_id: store.id }));
+        await Item.bulkCreate(itemsWithStore);
+        console.log(`Successfully injected ${gacoanMenu.length} menu items for ${store.name}.`);
 
     } catch (error) {
         console.error('Error seeding data:', error);

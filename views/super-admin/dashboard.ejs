@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Admin Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen">
+    
+    <nav class="bg-indigo-900 text-white p-4 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold">Super Admin Dashboard</h1>
+            <a href="/admin/logout" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Logout</a>
+        </div>
+    </nav>
+
+    <div class="container mx-auto mt-8 p-4">
+        
+        <!-- Add New Store -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+            <h2 class="text-2xl font-bold mb-4 text-gray-800 border-b pb-2">Create New Store</h2>
+            <form action="/super-admin/stores/add" method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Store Name</label>
+                    <input type="text" name="name" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="e.g. Mie Gacoan Tebet">
+                </div>
+                
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Slug (URL Path)</label>
+                    <input type="text" name="slug" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="e.g. mie-gacoan-tebet">
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Description</label>
+                    <textarea name="description" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" rows="2"></textarea>
+                </div>
+
+                <h3 class="text-lg font-semibold md:col-span-2 mt-4 text-indigo-600">Bank Details</h3>
+                
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Bank Name</label>
+                    <input type="text" name="bank_name" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="e.g. BCA">
+                </div>
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Account Number</label>
+                    <input type="text" name="bank_account_number" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="e.g. 1234567890">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Account Holder</label>
+                    <input type="text" name="bank_account_holder" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="e.g. PT Maju Mundur">
+                </div>
+
+                <h3 class="text-lg font-semibold md:col-span-2 mt-4 text-indigo-600">Store Admin Account</h3>
+                
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Admin Username</label>
+                    <input type="text" name="admin_username" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Admin Password</label>
+                    <input type="password" name="admin_password" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+
+                <div class="md:col-span-2 mt-4">
+                    <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded w-full transition">
+                        Create Store & Admin
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Store List -->
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Managed Stores</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <% stores.forEach(store => { %>
+                <div class="bg-white rounded-lg shadow-md p-6 relative">
+                    <h3 class="text-xl font-bold text-gray-800"><%= store.name %></h3>
+                    <p class="text-gray-500 text-sm mb-2">Slug: /stores/<%= store.slug %></p>
+                    <p class="text-gray-600 mb-4 h-12 overflow-hidden"><%= store.description %></p>
+                    
+                    <div class="border-t pt-4">
+                        <p class="text-sm font-semibold text-gray-700">Bank Info:</p>
+                        <p class="text-sm text-gray-600"><%= store.bank_name %> - <%= store.bank_account_number %></p>
+                    </div>
+
+                    <div class="mt-4 flex space-x-2">
+                        <a href="/admin/store/<%= store.id %>/dashboard" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-center py-2 rounded transition">
+                            Manage Dashboard
+                        </a>
+                        <a href="/stores/<%= store.slug %>" target="_blank" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 text-center py-2 rounded transition">
+                            Visit Store
+                        </a>
+                    </div>
+                </div>
+            <% }) %>
+        </div>
+
+    </div>
+
+</body>
+</html>

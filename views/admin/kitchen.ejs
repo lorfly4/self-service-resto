@@ -15,8 +15,8 @@
 
     <nav class="colorful-bg p-4 shadow-lg sticky top-0 z-50">
         <div class="container mx-auto flex justify-between items-center text-white">
-            <h1 class="text-2xl font-bold">Kitchen Display & Caller</h1>
-            <a href="/admin/dashboard" class="bg-white text-indigo-600 px-4 py-2 rounded-lg font-bold hover:bg-gray-100 transition">Back to Dashboard</a>
+            <h1 class="text-2xl font-bold">Kitchen Display & Caller - <%= store.name %></h1>
+            <a href="/admin/store/<%= store.id %>/dashboard" class="bg-white text-indigo-600 px-4 py-2 rounded-lg font-bold hover:bg-gray-100 transition">Back to Dashboard</a>
         </div>
     </nav>
 
@@ -54,7 +54,7 @@
                             Call Number
                         </button>
                         
-                        <form action="/admin/order/<%= order.id %>/status" method="POST" class="w-full">
+                        <form action="/admin/store/<%= store.id %>/order/<%= order.id %>/status" method="POST" class="w-full">
                             <input type="hidden" name="status" value="completed">
                             <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded transition shadow-md">
                                 Mark Completed

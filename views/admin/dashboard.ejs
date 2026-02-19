@@ -17,7 +17,7 @@
         <div class="container mx-auto flex justify-between items-center text-white">
             <h1 class="text-2xl font-bold">Admin Dashboard</h1>
             <div class="space-x-4">
-                <a href="/admin/kitchen" class="bg-white text-indigo-600 px-4 py-2 rounded-lg font-bold hover:bg-gray-100 transition">Kitchen / Caller</a>
+                <a href="/admin/store/<%= store.id %>/kitchen" class="bg-white text-indigo-600 px-4 py-2 rounded-lg font-bold hover:bg-gray-100 transition">Kitchen / Caller</a>
                 <a href="/admin/logout" class="text-white hover:text-gray-200 transition">Logout</a>
             </div>
         </div>
@@ -28,7 +28,7 @@
         <!-- Store Profile Section -->
         <div class="bg-white rounded-lg shadow-md p-6 mb-8">
             <h2 class="text-xl font-bold mb-4 text-gray-800 border-b pb-2">Store Profile</h2>
-            <form action="/admin/store/update" method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <form action="/admin/store/<%= store.id %>/update" method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-gray-700 text-sm font-bold mb-2">Store Name</label>
                     <input type="text" name="name" value="<%= store.name %>" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
@@ -48,7 +48,7 @@
         <!-- Add Menu Item Section -->
         <div class="bg-white rounded-lg shadow-md p-6 mb-8">
             <h2 class="text-xl font-bold mb-4 text-gray-800 border-b pb-2">Add Menu Item</h2>
-            <form action="/admin/items/add" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <form action="/admin/store/<%= store.id %>/items/add" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-gray-700 text-sm font-bold mb-2">Item Name</label>
                     <input type="text" name="name" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
