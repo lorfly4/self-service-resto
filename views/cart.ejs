@@ -1,0 +1,89 @@
+<%- include('partials/header') %>
+
+<h2 class="text-3xl font-bold mb-8 text-gray-800">Your Cart</h2>
+
+<% if (cartItems.length > 0) { %>
+    <div class="bg-white rounded-2xl shadow-xl overflow-hidden mb-8">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
+                    <tr>
+                        <th class="py-3 px-6 text-left">Item</th>
+                        <th class="py-3 px-6 text-center">Price</th>
+                        <th class="py-3 px-6 text-center">Qty</th>
+                        <th class="py-3 px-6 text-center">Subtotal</th>
+                        <th class="py-3 px-6 text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="text-gray-600 text-sm font-light">
+                    <% cartItems.forEach(function(cartItem) { %>
+                        <tr class="border-b border-gray-200 hover:bg-gray-50">
+                            <td class="py-3 px-6 text-left whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="mr-2">
+                                        <% if(cartItem.item.image_url) { %>
+                                            <img class="w-10 h-10 rounded-full object-cover" src="<%= cartItem.item.image_url %>"/>
+                                        <% } else { %>
+                                            <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-lg">🍲</div>
+                                        <% } %>
+                                    </div>
+                                    <span class="font-medium"><%= cartItem.item.name %></span>
+                                </div>
+                            </td>
+                            <td class="py-3 px-6 text-center">
+                                Rp <%= cartItem.item.price.toLocaleString() %>
+                            </td>
+                            <td class="py-3 px-6 text-center">
+                                <span class="bg-gray-200 text-gray-700 py-1 px-3 rounded-full text-xs font-bold"><%= cartItem.quantity %></span>
+                            </td>
+                            <td class="py-3 px-6 text-center">
+                                Rp <%= cartItem.subtotal.toLocaleString() %>
+                            </td>
+                            <td class="py-3 px-6 text-center">
+                                <form action="/cart/remove" method="POST">
+                                    <input type="hidden" name="itemId" value="<%= cartItem.item.id %>">
+                                    <button type="submit" class="text-red-500 hover:text-red-700 transform hover:scale-110 transition-transform">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                        </svg>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    <% }); %>
+                </tbody>
+            </table>
+        </div>
+        <div class="p-6 bg-gray-50 flex justify-end items-center">
+            <span class="text-xl font-bold text-gray-700 mr-4">Total:</span>
+            <span class="text-3xl font-bold text-indigo-600">Rp <%= total.toLocaleString() %></span>
+        </div>
+    </div>
+
+    <div class="flex justify-between items-center">
+        <a href="/" class="text-gray-600 hover:text-indigo-600 font-medium flex items-center transition">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+            </svg>
+            Add More Menu
+        </a>
+        <form action="/checkout" method="POST">
+            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-lg font-bold py-3 px-8 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
+                Checkout & Pay
+            </button>
+        </form>
+    </div>
+
+<% } else { %>
+    <div class="text-center py-20 bg-white rounded-2xl shadow-lg">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24 mx-auto text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+        <p class="text-2xl text-gray-500 mb-6">Keranjang Anda kosong.</p>
+        <a href="/" class="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition-colors">
+            Mulai Pesan
+        </a>
+    </div>
+<% } %>
+
+<%- include('partials/footer') %>

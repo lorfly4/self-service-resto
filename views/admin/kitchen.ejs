@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kitchen / Caller</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .colorful-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans leading-normal tracking-normal">
+
+    <nav class="colorful-bg p-4 shadow-lg sticky top-0 z-50">
+        <div class="container mx-auto flex justify-between items-center text-white">
+            <h1 class="text-2xl font-bold">Kitchen Display & Caller</h1>
+            <a href="/admin/dashboard" class="bg-white text-indigo-600 px-4 py-2 rounded-lg font-bold hover:bg-gray-100 transition">Back to Dashboard</a>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        
+        <% orders.forEach(function(order) { %>
+            <div class="bg-white rounded-lg shadow-xl overflow-hidden border-l-4 <%= order.status === 'paid' ? 'border-green-500' : 'border-yellow-500' %>">
+                <div class="p-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="text-2xl font-bold text-gray-800">Order #<%= order.order_number %></h3>
+                            <p class="text-sm text-gray-500"><%= new Date(order.createdAt).toLocaleTimeString() %></p>
+                        </div>
+                        <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide <%= order.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' %>">
+                            <%= order.status %>
+                        </span>
+                    </div>
+                    
+                    <div class="border-t border-b border-gray-100 py-4 mb-4">
+                        <ul class="space-y-2">
+                            <% order.OrderItems.forEach(item => { %>
+                                <li class="flex justify-between text-lg">
+                                    <span class="font-bold text-gray-700"><%= item.quantity %>x</span>
+                                    <span class="text-gray-600"><%= item.Item ? item.Item.name : 'Unknown' %></span>
+                                </li>
+                            <% }) %>
+                        </ul>
+                    </div>
+
+                    <div class="flex flex-col space-y-3">
+                        <button onclick="callOrder('<%= order.order_number %>')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded flex justify-center items-center transition shadow-md">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                            </svg>
+                            Call Number
+                        </button>
+                        
+                        <form action="/admin/order/<%= order.id %>/status" method="POST" class="w-full">
+                            <input type="hidden" name="status" value="completed">
+                            <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded transition shadow-md">
+                                Mark Completed
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        <% }); %>
+
+        <% if(orders.length === 0) { %>
+            <div class="col-span-full text-center py-20 text-gray-500">
+                <p class="text-xl">No active orders.</p>
+            </div>
+        <% } %>
+
+    </div>
+
+    <script>
+        function callOrder(orderNumber) {
+            // Text to Speech
+            const msg = new SpeechSynthesisUtterance();
+            // Try to find Indonesian voice
+            const voices = window.speechSynthesis.getVoices();
+            const idVoice = voices.find(voice => voice.lang === 'id-ID');
+            if(idVoice) msg.voice = idVoice;
+            
+            // Format number to be read clearly (e.g., "Order Number One Two Three")
+            // Or just "Nomor Antrian ORD-..."
+            // Let's strip "ORD-" and read the number
+            const number = orderNumber.replace('ORD-', '');
+            
+            msg.text = `Panggilan untuk nomor antrian ${number}. Silakan ambil pesanan Anda.`;
+            msg.lang = 'id-ID';
+            msg.rate = 0.9;
+            
+            window.speechSynthesis.speak(msg);
+        }
+    </script>
+</body>
+</html>
